@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Kinzoku Kanaria</title>
+    <link rel="stylesheet" href="./assets/sweetalert.dark.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            background-color: black;
+        }
+
+        .tile {
+            display: flex;
+            flex: auto;
+            width: 200px;
+            height: 200px;
+            margin: 10px;
+            background-color: #f2f2f2;
+            text-align: center;
+            cursor: pointer;
+            filter: grayscale(100%);
+            transition: transform .2s;
+        }
+
+        .tile:hover,
+        .tile.owned {
+            filter: none;
+        }
+
+        .tile:hover {
+            transform: scale(110%);
+        }
+
+        .tileNumber {
+            color: white;
+            font-size: xxx-large;
+            text-shadow: 2px 2px 0 black;
+            position: absolute;
+            right: 5px;
+            bottom: -3px;
+        }
+
+        .tile.claimed {
+            position: relative;
+        }
+
+        .tile.claimed::after {
+            content: "CLAIMED";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(35deg);
+            color: red;
+            font-size: xxx-large;
+            font-weight: bold;
+            font-family: sans-serif;
+            text-stroke: 1px black;
+            -webkit-text-stroke: 1px black;
+        }
+        
+
+        #header {
+            height: 500px;
+            background-image: url('assets/griffin.png');
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: contain;
+            margin-top: 50px;
+        }
+
+        #grid {
+            margin-top: 5px;
+        }
+
+        .separator {
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, black, silver, black);
+        }
+
+        #title {
+            width: 100%;
+        }
+
+        #title img {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        #menu ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #menu {
+            font-family: serif;
+            position: sticky;
+            top: 0;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+
+        #menu li {
+            float: left;
+        }
+
+        #menu li:last-child {
+            float: right;
+        }
+
+        #menu li a {
+            display: block;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+            color: white;
+        }
+
+        #about {
+            text-align: left;
+            color: #E0E0E0;
+            padding: 20px;
+            max-width: 800px;
+            margin: auto;
+        }
+
+        #about dt {
+            font-weight: bold;
+            color: #F0E68C;
+            padding-bottom: 10px;
+        }
+
+        #about dd {
+            margin-left: 20px;
+            color: #ADD8E6;
+            padding-bottom: 10px;
+        }
+
+
+        @media screen and (max-width: 600px) {
+            #header {
+                height: 300px;
+            }
+        }
+
+        @media screen and (max-width: 350px) {
+            #header {
+                height: 100px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="menu">
+        <ul>
+            <li><a href="#about">About</a></li>
+            <li><a href="https://rmrk.app" target="_blank">Modular NFTs</a></li>
+            <li><a href="javascript:null" id="connectButton">Connect</a></li>
+        </ul>
+    </div>
+    <div id="header"></div>
+    <div class="separator"></div>
+    <div id="title">
+        <img src="assets/kinzoku.jpg" alt="">
+    </div>
+    <div class="separator"></div>
+    <div id="grid"></div>
+    <div class="separator"></div>
+    <div id="about">
+        <h3>About</h3>
+        <dl>
+            <dt>What is Kinzoku?</dt>
+            <dd>Kanaria Kinzoku is a simple website for claiming metal print
+                posters of the original Kanaria custom art, given to Founder and
+                Super Founder edition NFT owners.</dd>
+            <dt>What do I need to do?</dt>
+            <dd>Log in with your crypto wallet. The UI will show which NFTs from
+                the list you own. Clicking on those will open a full view of the art
+                with the option to claim the artwork. You will input your address,
+                submit a blockchain transaction to formally register the claim, and
+                be notified when your plate is shipped.</dd>
+            <dt>My NFT says "Claimed"!</dt>
+            <dd>It is possible you bought a Kanaria on the secondary market
+                after its previous owner already claimed the artwork. This is
+                unfortunate, but there's nothing we can do about it.</dd>
+            <dt>Why do I need to connect my wallet?</dt>
+            <dd>By using the blockchain, we make sure only the NFT owner can
+                claim a plate and enter their address. The address is not stored on
+                the blockchain, only its non-reversible hash, so your information is
+                as safe as our shipping partner's database.</dd>
+            <dt>Can I ship to someone else?</dt>
+            <dd>You can ship anywhere. We will send it. If the package is not
+                accepted what happens to it is anyone's guess.</dd>
+        </dl>
+    </div>
+
+    <script src="./assets/sweetalert.min.js"></script>
+    <script type="module">
+        import { ethers } from "./assets/ethers.min.js";
+
+        const kanaria = "0x011ff409BC4803eC5cFaB41c3Fd1db99fD05c004";
+        const ownerChecker = "0x27E7C62511ccd95c78F869954e1e610506900e11";
+        const urlPrefix = "https://singular.app/collectibles/base/" + kanaria + "/";
+
+        const rpcs = ["https://base-mainnet.g.alchemy.com/v2/rqTvKzFSf2ZdQrq86oKDkVoLVt4CZb4w"]
+        const rpc_url = rpcs[Math.floor(Math.random() * rpcs.length)];
+        const provider = new ethers.JsonRpcProvider(rpc_url);
+
+        const gateways = ["https://cloudflare-ipfs.com/ipfs/"];
+        const gateway_url = gateways[Math.floor(Math.random() * gateways.length)];
+
+        const birds = {
+            "1": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/01.png",
+            "2": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/02.png",
+            "3": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/03.mp4",
+            "4": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/04.jpg",
+            "5": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/05.jpg",
+            "6": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/06.jpg",
+            "7": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/07.jpeg",
+            "8": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/08.jpg",
+            "9": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/09.jpg",
+            "10": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/10.jpg",
+            "11": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/11.jpg",
+            "12": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/12.png",
+            "13": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/13.jpg",
+            "14": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/14.png",
+            "15": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/15.jpg",
+            "16": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/16.jpg",
+            "17": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/17.jpg",
+            "18": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/18.png",
+            "19": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/xxx.png",
+            "20": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/20.png",
+            "21": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/21.jpg",
+            "22": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/22.jpg",
+            "23": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/23.png",
+            "24": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/24.png",
+            "25": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/25.jpg",
+            "26": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/26.jpg",
+            "27": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/27.jpg",
+            "28": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/28.jpg",
+            "29": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/29.png",
+            "30": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/30.jpg",
+            "31": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/31.jpg",
+            "32": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/32.jpg",
+            "33": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/33.png",
+            "34": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/34.jpg",
+            "35": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/35.jpg",
+            "36": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/36.mp4",
+            "37": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/37.mp4",
+            "38": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/38.jpg",
+            "39": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/39.jpg",
+            "40": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/40.png",
+            "41": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/41.jpg",
+            "42": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/42.jpg",
+            "43": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/43.mp4",
+            "44": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/44.jpg",
+            "45": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/45.png",
+            "46": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/46.jpg",
+            "47": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/47.jpg",
+            "48": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/48.jpg",
+            "49": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/49.jpg",
+            "50": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/50.jpg",
+            "51": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/51.jpg",
+            "52": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/52.png",
+            "53": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/53.png",
+            "54": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/54.jpg",
+            "55": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/55.jpg",
+            "56": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/56.jpg",
+            "57": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/57.jpg",
+            "58": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/58.jpg",
+            "59": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/59.mp4",
+            "60": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/60.png",
+            "61": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/61.mp4",
+            "62": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/62.png",
+            "63": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/63.jpg",
+            "64": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/64.jpg",
+            "65": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/65.mp4",
+            "66": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/66.jpg",
+            "67": null,
+            "68": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/68.mp4",
+            "69": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/69.jpg",
+            "70": "QmNvJBDjdzBuKYWVH3ay2fe7NiDEV63F8pXj21h6R24jxV/70.png",
+            "71": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/71.jpg",
+            "72": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/72.png",
+            "73": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/73.jpg",
+            "74": "QmVDvynt5ADDB3Tg2FSiVyQ8GNs9QCMAboNVnXqyae2g4o/74.png",
+            "75": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/75.png",
+            "76": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/76.jpg",
+            "77": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/77.jpg",
+            "78": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/78.jpg",
+            "79": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/79.jpg",
+            "80": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/80.jpg",
+            "81": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/81.jpg",
+            "82": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/82.mp4",
+            "83": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/83.jpg",
+            "84": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/84.jpg",
+            "85": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/85.jpg",
+            "86": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/86.jpg",
+            "87": null,
+            "88": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/88.jpg",
+            "89": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/89.jpg",
+            "90": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/90.jpg",
+            "91": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/91.jpg",
+            "92": null,
+            "93": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/93.png",
+            "94": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/94.jpg",
+            "95": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/95.jpg",
+            "96": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/96.jpg",
+            "97": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/97.png",
+            "98": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/98.jpg",
+            "99": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/99.png"
+        };
+
+        const abi = '[{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"ownerOf","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"}]';
+        const ownerCheckAbi = '[{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"getFounderOwners","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"nftAddress","outputs":[{"internalType":"contract IOwnableNft","name":"","type":"address"}],"stateMutability":"view","type":"function"}]';
+        const contract = new ethers.Contract(kanaria, abi, provider);
+        const ownerCheckContract = new ethers.Contract(ownerChecker, ownerCheckAbi, provider);
+
+        let browserProvider;
+        let browserSigner;
+
+        let checkTimer;
+
+        const grid = document.getElementById('grid');
+        const connectButton = document.getElementById('connectButton');
+
+        async function start() {
+            connectButton.addEventListener("click", connectWallet);
+
+            const spritesJson1Promise = await (await fetch('assets/sprites/sprite_thumbs0.json')).json();
+            const spritesJson2Promise = await (await fetch('assets/sprites/sprite_thumbs1.json')).json();
+            const spriteFrames = spritesJson1Promise.frames.concat(spritesJson2Promise.frames);
+
+            for (let i = 1; i < 100; i++) {
+                const tileLink = document.createElement('a');
+                tileLink.href = urlPrefix + i;
+                tileLink.target = '_blank';
+                tileLink.style.textDecoration = 'none';
+                const tile = document.createElement('div');
+                tile.className = 'tile ' + i;
+                tile.style.position = "relative";
+                tile.style.display = 'inline-block';
+                const number = document.createElement('div');
+                number.className = 'tileNumber';
+                number.textContent = i;
+
+                tile.appendChild(number);
+                var sprite = spriteFrames[i - 1];
+                let imageUrl = 'assets/sprites/sprite_thumbs0.jpg';
+                if (i >= 64) {
+                    imageUrl = 'assets/sprites/sprite_thumbs1.jpg';
+                }
+                tile.style.backgroundImage = `url(${imageUrl})`;
+                if ([67, 87, 92].includes(i)) {
+                    tile.style.backgroundPosition = `-${spriteFrames[spriteFrames.length - 2].frame.x}px -${spriteFrames[spriteFrames.length - 2].frame.y}px`;
+                } else {
+                    tile.style.backgroundPosition = `-${sprite.frame.x}px -${sprite.frame.y}px`;
+                }
+                tile.addEventListener('click', showBigBird);
+
+                tileLink.appendChild(tile);
+                grid.appendChild(tileLink);
+            }
+        }
+
+        async function connectWallet() {
+            if (window.ethereum === undefined) {
+                Swal.fire({
+                    title: 'Error!',
+                    html: 'No wallet found. Consider installing something like <a style="color:gray" href="https://metamask.io" target="_blank">Metamask</a>.',
+                    icon: 'error',
+                    confirmButtonText: 'Ok'
+                })
+            } else {
+                browserProvider = new ethers.BrowserProvider(window.ethereum);
+                browserSigner = browserProvider.getSigner();
+                connectButton.removeEventListener("click", connectWallet);
+                connectButton.addEventListener("click", disconnectWallet);
+                let primaryAddress = (await browserProvider.listAccounts())[0].address;
+                connectButton.text = "Disconnect " + parsedAddress(primaryAddress);
+                checkTimer = setInterval(async () => await checkOwnedNfts(primaryAddress), 2000);
+            }
+        }
+
+        function disconnectWallet() {
+            connectButton.removeEventListener("click", disconnectWallet);
+            connectButton.addEventListener("click", connectWallet);
+            connectButton.text = "Connect";
+            browserProvider = null;
+            browserSigner = null;
+            clearInterval(checkTimer);
+            let tiles = document.getElementsByClassName('tile');
+            for (let i = 0; i < tiles.length; i++) {
+                tiles[i].classList.remove('owned');
+            }
+        }
+
+        function parsedAddress(address) {
+            return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+        }
+
+        async function checkOwnedNfts(address) {
+            const time = 20000;
+            const oct = localStorage.getItem('ownerCheckTimestamp');
+            const refresh = !oct || ((new Date().getTime() - oct) > time);
+            if (refresh) {
+                localStorage.setItem("ownerCheckTimestamp", new Date().getTime());
+                let ownershipMap = await ownerCheckContract.getFounderOwners();
+                localStorage.setItem("ownershipMap", JSON.stringify(ownershipMap));
+            }
+            markOwnedNfts(address);
+        }
+
+        function markOwnedNfts(address) {
+            let ownershipMap = JSON.parse(localStorage.getItem("ownershipMap"));
+            let tiles = document.getElementsByClassName('tile');
+            for (let i = 0; i < ownershipMap.length; i++) {
+                if (ownershipMap[i] === address) {
+                    tiles[i].classList.add('owned');
+                }
+            }
+        }
+
+        function showBigBird(e) {
+            let id = parseInt(e.target.className.split(" ")[1]);
+
+            let s = (id < 10) ? "Super " : "";
+            let mediaUrl = gateway_url + birds[id];
+
+            Swal.fire({
+                title: `Kanaria ${s}Founder ${id}`,
+                imageUrl: (mediaUrl.indexOf('mp4') > -1) ? '' : mediaUrl,
+                html: (mediaUrl.indexOf('mp4') > -1) ? `<video style="width: 100%" controls><source src="${mediaUrl}" type="video/mp4"></video>` : '',
+                width: "90%",
+                showDenyButton: true,
+                showCancelButton: true,
+                confirmButtonText: "Claim",
+                denyButtonText: `Close`,
+                cancelButtonText: `View on Singular`,
+                showConfirmButton: (e.target.className.indexOf("owned") > -1 && e.target.className.indexOf("claimed") === -1),
+                denyButtonColor: "#555",
+                cancelButtonColor: "#555",
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire("Saved!", "", "success");
+                } else if (result.isDismissed) {
+                    window.open(urlPrefix + id, '_blank');
+                }
+            });;
+            e.preventDefault();
+        }
+
+        start();
+
+    </script>
+</body>
+
+</html>
