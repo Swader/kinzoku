@@ -155,6 +155,11 @@ body {
     padding-bottom: 10px;
 }
 
+.whitelink {
+    color: white;
+    font-weight: bold;
+}
+
 
 @media screen and (max-width: 600px) {
     #header {
