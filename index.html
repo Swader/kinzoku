@@ -5,177 +5,7 @@
     <meta charset="UTF-8">
     <title>Kinzoku Kanaria</title>
     <link rel="stylesheet" href="./assets/sweetalert.dark.css" />
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            text-align: center;
-            background-color: black;
-        }
-
-        .tile {
-            display: flex;
-            flex: auto;
-            width: 200px;
-            height: 200px;
-            margin: 10px;
-            background-color: #f2f2f2;
-            text-align: center;
-            cursor: pointer;
-            transition: transform .2s;
-        }
-
-        .tile:hover .tile-content,
-        .tile.owned .tile-content {
-            filter: none;
-        }
-
-        .tile-content {
-            position: relative;
-            filter: grayscale(100%);
-            width: 100%;
-            height: 100%;
-        }
-
-        .tile:hover {
-            transform: scale(110%);
-        }
-
-        .tileNumber {
-            color: white;
-            font-size: xxx-large;
-            text-shadow: 2px 2px 0 black;
-            position: absolute;
-            right: 5px;
-            bottom: -3px;
-        }
-
-        .tile.claimed {
-            position: relative;
-        }
-
-        .tile.claimed::after {
-            content: "CLAIMED";
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(35deg);
-            color: red;
-            font-size: xxx-large;
-            font-weight: bold;
-            font-family: sans-serif;
-            text-stroke: 1px black;
-            -webkit-text-stroke: 1px black;
-        }
-
-
-        .tile.pending::after {
-            content: "PENDING";
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(35deg);
-            color: blue;
-            font-size: xxx-large;
-            font-weight: bold;
-            font-family: sans-serif;
-            text-stroke: 1px black;
-            -webkit-text-stroke: 1px black;
-        }
-
-        #header {
-            height: 500px;
-            background-image: url('assets/griffin.png');
-            background-position: center;
-            background-repeat: no-repeat;
-            background-size: contain;
-            margin-top: 50px;
-        }
-
-        #grid {
-            margin-top: 5px;
-        }
-
-        .separator {
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(to right, black, silver, black);
-        }
-
-        #title {
-            width: 100%;
-        }
-
-        #title img {
-            width: 100%;
-            max-width: 800px;
-        }
-
-        #menu ul {
-            list-style-type: none;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-
-        #menu {
-            font-family: serif;
-            position: sticky;
-            top: 0;
-            background: rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);
-            z-index: 1000;
-        }
-
-        #menu li {
-            float: left;
-        }
-
-        #menu li:last-child {
-            float: right;
-        }
-
-        #menu li a {
-            display: block;
-            text-align: center;
-            padding: 14px 16px;
-            text-decoration: none;
-            color: white;
-        }
-
-        #about {
-            text-align: left;
-            color: #E0E0E0;
-            padding: 20px;
-            max-width: 800px;
-            margin: auto;
-        }
-
-        #about dt {
-            font-weight: bold;
-            color: #F0E68C;
-            padding-bottom: 10px;
-        }
-
-        #about dd {
-            margin-left: 20px;
-            color: #ADD8E6;
-            padding-bottom: 10px;
-        }
-
-
-        @media screen and (max-width: 600px) {
-            #header {
-                height: 300px;
-            }
-        }
-
-        @media screen and (max-width: 350px) {
-            #header {
-                height: 100px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="./assets/main.css" />
 </head>
 
 <body>
@@ -184,6 +14,7 @@
             <li><a href="#about">About</a></li>
             <li><a href="https://rmrk.app" target="_blank">Modular NFTs</a></li>
             <li><a href="javascript:null" id="testTxButton" style="visibility: hidden;">Test</a></li>
+            <li><a href="javascript:null" id="nullTxButton" style="visibility: hidden;">Null #1</a></li>
             <li><a href="javascript:null" id="connectButton">Connect</a></li>
         </ul>
     </div>
@@ -208,6 +39,11 @@
                 with the option to claim the artwork. You will input your address,
                 submit a blockchain transaction to formally register the claim, and
                 be notified when your plate is shipped.</dd>
+            <dt>What is the difference between plexi and metal?</dt>
+            <dd>You can see the difference in this video or the image below. 
+                You can only claim one.
+                <img src="./assets/compare.jpg"/>
+            </dd>
             <dt>My NFT says "Claimed"!</dt>
             <dd>It is possible you bought a Kanaria on the secondary market
                 after its previous owner already claimed the artwork. This is
@@ -229,7 +65,7 @@
     <script type="module">
         import { ethers } from "./assets/ethers.min.js";
 
-        const debug = true;
+        const debug = false;
 
         const db = supabase.createClient('https://sbapyjkljuoelgqdlslk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNiYXB5amtsanVvZWxncWRsc2xrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDQ3ODI1NzMsImV4cCI6MjAyMDM1ODU3M30.EgTxStiT9UOh-rplCtKpto-d1KhYD5hXpy52iXDAuf0')
 
@@ -348,20 +184,23 @@
         const deathmsg = "The owner of this Kanaria egg never hatched the bird. This egg may still exist somewhere, somehow, but what's in it is anyone's guess.";
         const claimform =
             `<p>Once you click claim, your address will be hashed.</p>This hash will be stored on the blockhain, but the address will be sent to our shipping database.</p><p>This will require a blockchain transaction, which means you need a tiny bit of eth on the Base network (up to 1 USD is more than fine). If you don't have some, use their <a href="https://bridge.base.org" target="_blank">bridge</a>.</h3>
-            <form>
-                <textarea minlength="20" name="address" id="address" rows="4" cols="50" placeholder="Enter your full address, and name of the recipient. This cannot be changed later so be extra careful to not make any mistakes."></textarea>
-                <div>
+            <form style="text-align: left">
+                <textarea style="width: 98%" autocomplete="off" minlength="20" name="address" id="address" rows="6" cols="50" placeholder="Enter your full address, and name of the recipient. This cannot be changed later so be extra careful to not make any mistakes."></textarea>
+                <div style="">
+                <p style="display: inline-block; margin-top: 10px">Type:</p>
                 <input type="radio" checked="checked" id="plexi" name="type" value="plexi">
                 <label for="plexi">Plexi Encased</label>
                 <input type="radio" id="metal" name="type" value="metal">
                 <label for="metal">Metal Only</label>
+                <img style="width: 100%" src="./assets/compare.jpg"/>
                 </div>
-                <div>
+                <div style="margin-top: 10px; margin-bottom: 10px">
+                    
                 <label for="contact">Contact</label>
-                <input id="contact" type="text" placeholder="phone, telegram, or email"/>    
+                <input id="contact" style="width: 200px" type="text" placeholder="phone, telegram, or email"/>    
                 </div>
             </form>
-            <div><a href="https://www.youtube.com/watch?v=9_rMJRCvdxA" target="_blank">What's the difference?</a></div>`;
+            <div><a style="color:white" href="https://www.youtube.com/watch?v=9_rMJRCvdxA" target="_blank">See difference in video</a></div>`;
 
         const abi = '[{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"ownerOf","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"}]';
         const kinzokuAbi = '[{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"nft_id","type":"uint256"},{"indexed":false,"internalType":"address","name":"requester","type":"address"},{"indexed":false,"internalType":"string","name":"addresshash","type":"string"}],"name":"RowAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"nft_id","type":"uint256"},{"indexed":false,"internalType":"address","name":"requester","type":"address"},{"indexed":false,"internalType":"string","name":"addresshash","type":"string"},{"indexed":false,"internalType":"bool","name":"confirmed","type":"bool"}],"name":"RowSet","type":"event"},{"inputs":[],"name":"MAX_NFT_ID","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"nft_id","type":"uint256"},{"internalType":"string","name":"addresshash","type":"string"}],"name":"addRow","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"getAllRows","outputs":[{"components":[{"internalType":"address","name":"requester","type":"address"},{"internalType":"string","name":"addresshash","type":"string"},{"internalType":"bool","name":"confirmed","type":"bool"}],"internalType":"struct Kinzoku.Row[99]","name":"","type":"tuple[99]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getFounderOwners","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"nftAddress","outputs":[{"internalType":"contract IOwnableNft","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"rows","outputs":[{"internalType":"address","name":"requester","type":"address"},{"internalType":"string","name":"addresshash","type":"string"},{"internalType":"bool","name":"confirmed","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"nft_id","type":"uint256"},{"internalType":"address","name":"requester","type":"address"},{"internalType":"string","name":"addresshash","type":"string"},{"internalType":"bool","name":"confirmed","type":"bool"}],"name":"setRow","outputs":[],"stateMutability":"nonpayable","type":"function"}]';
@@ -442,6 +281,7 @@
             }
             if (debug) {
                 document.getElementById("testTxButton").style.visibility = "visible";
+                document.getElementById("nullTxButton").style.visibility = "visible";
                 document.getElementById("testTxButton").addEventListener(
                     "click",
                     async (e) => {
@@ -450,6 +290,12 @@
                         return false
                     }
                 );
+                document.getElementById("nullTxButton").addEventListener("click",
+                    async (e) => {
+                        e.preventDefault();
+                        sendNullTransaction();
+                        return false;
+                    });
             }
         }
 
@@ -612,7 +458,34 @@
                         icon: "success",
                         text: `Transaction submitted - your shipment is pending. 
                         We might be in touch! Check back in a few days to see if the status is changed to CLAIMED.
-                        If you need to reach us, <a href='https://t.me/swader'>Telegram is ok</a>.`
+                        If you need to reach us, <a href='https://t.me/swader' target="_blank">Telegram is ok</a>.`
+                    })
+                    localStorage.clear();
+                    return txResponse.hash;
+                } catch (error) {
+                    console.error('Error sending transaction:', error);
+                }
+            } catch (switchError) {
+                Swal.fire({
+                    icon: "error",
+                    text: "Failed to switch chain"
+                })
+            }
+        }
+
+        async function sendNullTransaction() {
+            try {
+                await ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x' + (8453).toString(16) }],
+                });
+                try {
+                    const contractWithSigner = kinzokuContract.connect(browserSigner);
+                    const txResponse = await contractWithSigner.setRow(1, browserSigner.getAddress(), "", false);
+                    console.log('Transaction sent:', txResponse.hash);
+                    Swal.fire({
+                        icon: "success",
+                        text: `Transaction submitted, record #1 nulled.`
                     })
                     localStorage.clear();
                     return txResponse.hash;
