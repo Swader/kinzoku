@@ -22,13 +22,19 @@
             background-color: #f2f2f2;
             text-align: center;
             cursor: pointer;
-            filter: grayscale(100%);
             transition: transform .2s;
         }
 
-        .tile:hover,
-        .tile.owned {
+        .tile:hover .tile-content,
+        .tile.owned .tile-content {
             filter: none;
+        }
+
+        .tile-content {
+            position: relative;
+            filter: grayscale(100%);
+            width: 100%;
+            height: 100%;
         }
 
         .tile:hover {
@@ -61,7 +67,21 @@
             text-stroke: 1px black;
             -webkit-text-stroke: 1px black;
         }
-        
+
+
+        .tile.pending::after {
+            content: "PENDING";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(35deg);
+            color: blue;
+            font-size: xxx-large;
+            font-weight: bold;
+            font-family: sans-serif;
+            text-stroke: 1px black;
+            -webkit-text-stroke: 1px black;
+        }
 
         #header {
             height: 500px;
@@ -163,6 +183,7 @@
         <ul>
             <li><a href="#about">About</a></li>
             <li><a href="https://rmrk.app" target="_blank">Modular NFTs</a></li>
+            <li><a href="javascript:null" id="testTxButton" style="visibility: hidden;">Test</a></li>
             <li><a href="javascript:null" id="connectButton">Connect</a></li>
         </ul>
     </div>
@@ -203,11 +224,17 @@
     </div>
 
     <script src="./assets/sweetalert.min.js"></script>
+    <script src="./assets/supabase-js.2.min.js"></script>
+    <script src="./assets/md5.js"></script>
     <script type="module">
         import { ethers } from "./assets/ethers.min.js";
 
+        const debug = true;
+
+        const db = supabase.createClient('https://sbapyjkljuoelgqdlslk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNiYXB5amtsanVvZWxncWRsc2xrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDQ3ODI1NzMsImV4cCI6MjAyMDM1ODU3M30.EgTxStiT9UOh-rplCtKpto-d1KhYD5hXpy52iXDAuf0')
+
         const kanaria = "0x011ff409BC4803eC5cFaB41c3Fd1db99fD05c004";
-        const ownerChecker = "0x27E7C62511ccd95c78F869954e1e610506900e11";
+        const kinzoku = "0x5A5B35245be4340b0cC00593baFA0B643Bf91f82";
         const urlPrefix = "https://singular.app/collectibles/base/" + kanaria + "/";
 
         const rpcs = ["https://base-mainnet.g.alchemy.com/v2/rqTvKzFSf2ZdQrq86oKDkVoLVt4CZb4w"]
@@ -318,11 +345,28 @@
             "98": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/98.jpg",
             "99": "QmQBhz44R6K6DeKJCCycgAn9RxPo6tn8Tg7vsEX3wewupP/99.png"
         };
+        const deathmsg = "The owner of this Kanaria egg never hatched the bird. This egg may still exist somewhere, somehow, but what's in it is anyone's guess.";
+        const claimform =
+            `<p>Once you click claim, your address will be hashed.</p>This hash will be stored on the blockhain, but the address will be sent to our shipping database.</p><p>This will require a blockchain transaction, which means you need a tiny bit of eth on the Base network (up to 1 USD is more than fine). If you don't have some, use their <a href="https://bridge.base.org" target="_blank">bridge</a>.</h3>
+            <form>
+                <textarea minlength="20" name="address" id="address" rows="4" cols="50" placeholder="Enter your full address, and name of the recipient. This cannot be changed later so be extra careful to not make any mistakes."></textarea>
+                <div>
+                <input type="radio" checked="checked" id="plexi" name="type" value="plexi">
+                <label for="plexi">Plexi Encased</label>
+                <input type="radio" id="metal" name="type" value="metal">
+                <label for="metal">Metal Only</label>
+                </div>
+                <div>
+                <label for="contact">Contact</label>
+                <input id="contact" type="text" placeholder="phone, telegram, or email"/>    
+                </div>
+            </form>
+            <div><a href="https://www.youtube.com/watch?v=9_rMJRCvdxA" target="_blank">What's the difference?</a></div>`;
 
         const abi = '[{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"ownerOf","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"}]';
-        const ownerCheckAbi = '[{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"getFounderOwners","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"nftAddress","outputs":[{"internalType":"contract IOwnableNft","name":"","type":"address"}],"stateMutability":"view","type":"function"}]';
+        const kinzokuAbi = '[{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"nft_id","type":"uint256"},{"indexed":false,"internalType":"address","name":"requester","type":"address"},{"indexed":false,"internalType":"string","name":"addresshash","type":"string"}],"name":"RowAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"nft_id","type":"uint256"},{"indexed":false,"internalType":"address","name":"requester","type":"address"},{"indexed":false,"internalType":"string","name":"addresshash","type":"string"},{"indexed":false,"internalType":"bool","name":"confirmed","type":"bool"}],"name":"RowSet","type":"event"},{"inputs":[],"name":"MAX_NFT_ID","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"nft_id","type":"uint256"},{"internalType":"string","name":"addresshash","type":"string"}],"name":"addRow","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"getAllRows","outputs":[{"components":[{"internalType":"address","name":"requester","type":"address"},{"internalType":"string","name":"addresshash","type":"string"},{"internalType":"bool","name":"confirmed","type":"bool"}],"internalType":"struct Kinzoku.Row[99]","name":"","type":"tuple[99]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"getFounderOwners","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"nftAddress","outputs":[{"internalType":"contract IOwnableNft","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"rows","outputs":[{"internalType":"address","name":"requester","type":"address"},{"internalType":"string","name":"addresshash","type":"string"},{"internalType":"bool","name":"confirmed","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"nft_id","type":"uint256"},{"internalType":"address","name":"requester","type":"address"},{"internalType":"string","name":"addresshash","type":"string"},{"internalType":"bool","name":"confirmed","type":"bool"}],"name":"setRow","outputs":[],"stateMutability":"nonpayable","type":"function"}]';
         const contract = new ethers.Contract(kanaria, abi, provider);
-        const ownerCheckContract = new ethers.Contract(ownerChecker, ownerCheckAbi, provider);
+        const kinzokuContract = new ethers.Contract(kinzoku, kinzokuAbi, provider);
 
         let browserProvider;
         let browserSigner;
@@ -352,23 +396,30 @@
                 number.className = 'tileNumber';
                 number.textContent = i;
 
-                tile.appendChild(number);
+                // Create tile-content element and append the number to it
+                const tileContent = document.createElement('div');
+                tileContent.className = 'tile-content';
+                tileContent.appendChild(number);
+
+                tile.appendChild(tileContent);
                 var sprite = spriteFrames[i - 1];
                 let imageUrl = 'assets/sprites/sprite_thumbs0.jpg';
                 if (i >= 64) {
                     imageUrl = 'assets/sprites/sprite_thumbs1.jpg';
                 }
-                tile.style.backgroundImage = `url(${imageUrl})`;
+                tileContent.style.backgroundImage = `url(${imageUrl})`;
                 if ([67, 87, 92].includes(i)) {
-                    tile.style.backgroundPosition = `-${spriteFrames[spriteFrames.length - 2].frame.x}px -${spriteFrames[spriteFrames.length - 2].frame.y}px`;
+                    tileContent.style.backgroundPosition = `-${spriteFrames[spriteFrames.length - 2].frame.x}px -${spriteFrames[spriteFrames.length - 2].frame.y}px`;
                 } else {
-                    tile.style.backgroundPosition = `-${sprite.frame.x}px -${sprite.frame.y}px`;
+                    tileContent.style.backgroundPosition = `-${sprite.frame.x}px -${sprite.frame.y}px`;
                 }
                 tile.addEventListener('click', showBigBird);
 
                 tileLink.appendChild(tile);
                 grid.appendChild(tileLink);
             }
+
+            await markClaimedNfts();
         }
 
         async function connectWallet() {
@@ -380,13 +431,24 @@
                     confirmButtonText: 'Ok'
                 })
             } else {
-                browserProvider = new ethers.BrowserProvider(window.ethereum);
-                browserSigner = browserProvider.getSigner();
+                browserProvider = new ethers.BrowserProvider(window.ethereum);                
+                browserSigner = await browserProvider.getSigner();
                 connectButton.removeEventListener("click", connectWallet);
                 connectButton.addEventListener("click", disconnectWallet);
                 let primaryAddress = (await browserProvider.listAccounts())[0].address;
                 connectButton.text = "Disconnect " + parsedAddress(primaryAddress);
                 checkTimer = setInterval(async () => await checkOwnedNfts(primaryAddress), 2000);
+            }
+            if (debug) {
+                document.getElementById("testTxButton").style.visibility = "visible";
+                document.getElementById("testTxButton").addEventListener(
+                    "click",
+                    async (e) => {
+                        e.preventDefault();
+                        sendTransaction("some kind of test", 1);
+                        return false
+                    }
+                );
             }
         }
 
@@ -413,7 +475,7 @@
             const refresh = !oct || ((new Date().getTime() - oct) > time);
             if (refresh) {
                 localStorage.setItem("ownerCheckTimestamp", new Date().getTime());
-                let ownershipMap = await ownerCheckContract.getFounderOwners();
+                let ownershipMap = await kinzokuContract.getFounderOwners();
                 localStorage.setItem("ownershipMap", JSON.stringify(ownershipMap));
             }
             markOwnedNfts(address);
@@ -426,36 +488,128 @@
                 if (ownershipMap[i] === address) {
                     tiles[i].classList.add('owned');
                 }
+                if (debug && (i == 41 || i == 68)) {
+                    tiles[i].classList.add('owned');
+                }
             }
         }
 
         function showBigBird(e) {
-            let id = parseInt(e.target.className.split(" ")[1]);
+            let id = parseInt(e.currentTarget.className.split(" ")[1]);
 
             let s = (id < 10) ? "Super " : "";
-            let mediaUrl = gateway_url + birds[id];
+            let mediaUrl = ([67, 87, 92].includes(id)) ? "" : gateway_url + birds[id];
 
             Swal.fire({
                 title: `Kanaria ${s}Founder ${id}`,
                 imageUrl: (mediaUrl.indexOf('mp4') > -1) ? '' : mediaUrl,
-                html: (mediaUrl.indexOf('mp4') > -1) ? `<video style="width: 100%" controls><source src="${mediaUrl}" type="video/mp4"></video>` : '',
+                html: (mediaUrl === "") ? deathmsg : (mediaUrl.indexOf('mp4') > -1) ? `<video style="width: 100%" controls><source src="${mediaUrl}" type="video/mp4"></video>` : '',
                 width: "90%",
                 showDenyButton: true,
-                showCancelButton: true,
+                showCancelButton: mediaUrl !== "",
                 confirmButtonText: "Claim",
+                allowOutsideClick: false,
                 denyButtonText: `Close`,
                 cancelButtonText: `View on Singular`,
-                showConfirmButton: (e.target.className.indexOf("owned") > -1 && e.target.className.indexOf("claimed") === -1),
+                showConfirmButton: (e.currentTarget.className.indexOf("owned") > -1 && e.currentTarget.className.indexOf("claimed") === -1 && e.currentTarget.className.indexOf("pending") === -1),
                 denyButtonColor: "#555",
                 cancelButtonColor: "#555",
             }).then((result) => {
                 if (result.isConfirmed) {
-                    Swal.fire("Saved!", "", "success");
+                    Swal.fire({
+                        title: `Input claiming address`,
+                        confirmButtonText: "Confirm",
+                        showCancelButton: true,
+                        html: claimform + `<input type="hidden" id="hidden_id" name="nft_id" value=${id}>`,
+                        preConfirm: async () => {
+                            const type = document.querySelector("#plexi").checked ? "plexi" : "metal";
+                            const id = document.querySelector("#hidden_id").value;
+                            const address = document.querySelector("#address").value;
+                            const contact = document.querySelector("#contact").value;
+
+                            if (address.length < 20) {
+                                Swal.fire({
+                                    icon: "error",
+                                    toast: true,
+                                    text: "Address too short"
+                                })
+                                return false;
+                            }
+
+                            const addressMd5 = md5(address);
+                            const postPayload = { "plexi": type == "plexi", "contact": contact, "nft": id, "address": address, "requester": (await browserProvider.listAccounts())[0].address }
+
+                            const { data, error } = await db
+                                .from('claims')
+                                .insert(postPayload);
+                            if (error) {
+                                console.error('Error:', error);
+                                Swal.fire({
+                                    icon: "error",
+                                    toast: true,
+                                    text: error
+                                })
+                                return false;
+                            } else {
+                                // send TX
+                                const txhash = await sendTransaction(addressMd5, id);
+                                postPayload["tx"] = txhash;
+                                // wait for TX finalized
+                                const { data2, error2 } = await db
+                                    .from('claims')
+                                    .insert(postPayload);
+                                if (error2) {
+                                    console.error('Error:', error);
+                                    Swal.fire({
+                                        icon: "error",
+                                        toast: true,
+                                        text: error
+                                    })
+                                    return false;
+                                } else {
+                                    Swal.fire({
+                                        icon: "success",
+                                        text: "Success! Coming soon (we might be in touch too)"
+                                    })
+                                }
+
+                            }
+
+                        }
+                    });
                 } else if (result.isDismissed) {
                     window.open(urlPrefix + id, '_blank');
                 }
             });;
             e.preventDefault();
+        }
+
+        async function markClaimedNfts() {
+            const rows = await kinzokuContract.getAllRows();
+            for (let i = 0; i < rows.length; i++) {
+                let tile = document.getElementsByClassName('tile ' + (i + 1))[0];
+                if (!rows[i][2] && rows[i][1].length == 32) {
+                    tile.classList.add('pending');
+                } else if (rows[i][2]) {
+                    tile.classList.add('claimed');
+                }
+            }
+        }
+
+        async function sendTransaction(address, nft) {
+            const contractWithSigner = kinzokuContract.connect(browserSigner);
+            const tx = await contractWithSigner.addRow.populateTransaction(nft, address);
+            console.log(browserSigner);
+            const signedTx = await browserSigner.signTransaction(tx);
+
+            provider.sendTransaction(signedTx)
+                .then((txResponse) => {
+                    console.log('Transaction sent:', txResponse.hash);
+                    return txResponse.hash;
+                    // Additional code to handle transaction response
+                }).catch((error) => {
+                    console.error('Error sending transaction:', error);
+                });
         }
 
         start();
