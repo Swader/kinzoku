@@ -370,6 +370,7 @@
 
         let browserProvider;
         let browserSigner;
+        let primaryAddress;
 
         let checkTimer;
 
@@ -431,7 +432,7 @@
                     confirmButtonText: 'Ok'
                 })
             } else {
-                browserProvider = new ethers.BrowserProvider(window.ethereum);                
+                browserProvider = new ethers.BrowserProvider(window.ethereum);
                 browserSigner = await browserProvider.getSigner();
                 connectButton.removeEventListener("click", connectWallet);
                 connectButton.addEventListener("click", disconnectWallet);
@@ -479,6 +480,7 @@
                 localStorage.setItem("ownershipMap", JSON.stringify(ownershipMap));
             }
             markOwnedNfts(address);
+            markClaimedNfts();
         }
 
         function markOwnedNfts(address) {
@@ -597,19 +599,79 @@
         }
 
         async function sendTransaction(address, nft) {
-            const contractWithSigner = kinzokuContract.connect(browserSigner);
-            const tx = await contractWithSigner.addRow.populateTransaction(nft, address);
-            console.log(browserSigner);
-            const signedTx = await browserSigner.signTransaction(tx);
-
-            provider.sendTransaction(signedTx)
-                .then((txResponse) => {
-                    console.log('Transaction sent:', txResponse.hash);
-                    return txResponse.hash;
-                    // Additional code to handle transaction response
-                }).catch((error) => {
-                    console.error('Error sending transaction:', error);
+            try {
+                await ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x' + (8453).toString(16) }],
                 });
+                try {
+                    const contractWithSigner = kinzokuContract.connect(browserSigner);
+                    const txResponse = await contractWithSigner.addRow(nft, address);
+                    console.log('Transaction sent:', txResponse.hash);
+                    Swal.fire({
+                        icon: "success",
+                        text: `Transaction submitted - your shipment is pending. 
+                        We might be in touch! Check back in a few days to see if the status is changed to CLAIMED.
+                        If you need to reach us, <a href='https://t.me/swader'>Telegram is ok</a>.`
+                    })
+                    localStorage.clear();
+                    return txResponse.hash;
+                } catch (error) {
+                    console.error('Error sending transaction:', error);
+                }
+            } catch (switchError) {
+                Swal.fire({
+                    icon: "error",
+                    text: "Failed to switch chain"
+                })
+            }
+        }
+
+        async function sendTransactionGoodUx(address, nft) {
+            // This was originally supposed to be a function
+            // which signs a TX regardless of chain and sends it via a
+            // hardcoded RPC. But Metamask people are restrictive idiots
+            // who insist on keeping UX in web3 at a minimum, so this is
+            // not possible, because even signing a TX makes MM require
+            // that chainIDs match. So, we use the less UX friendly
+            // sendTransaction function.
+            const contractWithSigner = kinzokuContract.connect(browserSigner);
+            const sender = await browserSigner.getAddress();
+            try {
+                const txRequest = await contractWithSigner.addRow.populateTransaction(nft, address);
+                const nonce = await provider.getTransactionCount(sender, 'latest');
+                const gasPrice = 100000;
+                const gasLimitEstimate = await provider.estimateGas({
+                    ...txRequest,
+                    from: sender
+                });
+                const gasLimit = gasLimitEstimate * BigInt(2);
+                const transaction = {
+                    to: txRequest.to,
+                    data: txRequest.data,
+                    nonce: nonce,
+                    gasPrice: gasPrice,
+                    gasLimit: gasLimit,
+                    chainId: 8453
+                };
+                const signedTransaction = await browserSigner.signTypedData(
+                    { chainId: 8453, name: 'Kinzoku', version: '1.0.0' },
+                    {
+                        Transaction: [
+                            { name: 'nonce', type: 'uint256' },
+                            { name: 'to', type: 'address' },
+                            { name: 'gasLimit', type: 'uint256' },
+                            { name: 'gasPrice', type: 'uint256' },
+                            { name: 'data', type: 'bytes' }]
+                    },
+                    transaction
+                );
+                const txResponse = await provider.sendTransaction(signedTransaction);
+                console.log('Transaction sent:', txResponse.hash);
+                return txResponse.hash;
+            } catch (error) {
+                console.error('Error sending transaction:', error);
+            }
         }
 
         start();
